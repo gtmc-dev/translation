@@ -1,0 +1,3 @@
+[submodule "glossary"]
+	path = glossary
+	url = https://github.com/TechMC-Glossary/TechMC-Glossary
