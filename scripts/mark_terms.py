@@ -13,10 +13,11 @@ Usage:
 
 import argparse
 import csv
+from dataclasses import dataclass
 import difflib
 import re
 import sys
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from pathlib import Path
 
 
@@ -39,14 +40,47 @@ LANG_MAP: dict[str, LangColumns] = {
 DEFAULT_GLOSSARY = Path(__file__).resolve().parent.parent / "glossary" / "TechMC Glossary.csv"
 
 _TERM_CHAR = re.compile(r"\S+")
+_WORD_CHAR = re.compile(r"[A-Za-z0-9_]+")
 _CONTESTED_TERM = re.compile(r"\*+$")
 _CJK_RANGE = re.compile(r"[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]")
+_LATIN_RANGE = re.compile(r"[A-Za-z]")
+_LATIN_BOUNDARY = re.compile(r"(?<![A-Za-z0-9_]){}(?![A-Za-z0-9_])")
+_EXISTING_TERM = re.compile(r"<term>.*?</term>", re.DOTALL)
+_HTML_TAG = re.compile(r"</?[^>]+>")
+_INLINE_CODE = re.compile(r"`+[^`]*`+")
+_URL = re.compile(r"https?://[^\s)]+")
+_MARKDOWN_LINK_DESTINATION = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 
 
-def load_glossary(csv_path: Path, target_lang: str, min_len: int = 2) -> list[str]:
+@dataclass(frozen=True)
+class GlossaryTerm:
+    text: str
+    source: str
+
+
+@dataclass(frozen=True)
+class TermIndex:
+    exact_terms: tuple[GlossaryTerm, ...]
+    fuzzy_terms_by_word_count: dict[int, tuple[GlossaryTerm, ...]]
+
+
+def _clean_term(term: str) -> str:
+    return _CONTESTED_TERM.sub("", term).strip()
+
+
+def _term_variants(term: str) -> list[str]:
+    variants = [term]
+    if "/" in term:
+        variants.extend(part.strip() for part in term.split("/") if part.strip())
+    return variants
+
+
+def load_glossary(
+    csv_path: Path, target_lang: str, min_len: int = 2
+) -> list[GlossaryTerm]:
     lang_cols = LANG_MAP.get(target_lang, LANG_MAP["en"])
 
-    terms: set[str] = set()
+    terms: dict[tuple[str, str], GlossaryTerm] = {}
     with open(csv_path, encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
         next(reader)
@@ -54,24 +88,25 @@ def load_glossary(csv_path: Path, target_lang: str, min_len: int = 2) -> list[st
             if not row or len(row) < 3:
                 continue
 
-            candidates: list[str] = []
+            candidates: list[tuple[str, str]] = []
             full = row[2].strip() if len(row) > 2 else ""
             if full:
-                candidates.append(full)
+                candidates.append((full, "en"))
             short = row[1].strip() if len(row) > 1 else ""
             if short:
-                candidates.append(short)
+                candidates.append((short, "short"))
             if target_lang != "en" and len(row) > lang_cols.term_idx:
                 translated = row[lang_cols.term_idx].strip()
                 if translated:
-                    candidates.append(translated)
+                    candidates.append((translated, "translation"))
 
-            for t in candidates:
-                cleaned = _CONTESTED_TERM.sub("", t).strip()
-                if cleaned and len(cleaned) >= min_len:
-                    terms.add(cleaned)
+            for candidate, source in candidates:
+                for variant in _term_variants(_clean_term(candidate)):
+                    cleaned = _clean_term(variant)
+                    if cleaned and len(cleaned) >= min_len:
+                        terms[(cleaned.lower(), source)] = GlossaryTerm(cleaned, source)
 
-    return sorted(terms, key=len, reverse=True)
+    return sorted(terms.values(), key=lambda term: len(term.text), reverse=True)
 
 
 def _tokenize(text: str) -> list[tuple[str, int, int]]:
@@ -81,61 +116,152 @@ def _tokenize(text: str) -> list[tuple[str, int, int]]:
     return tokens
 
 
-def _cjk_char_ngrams(
-    token_text: str, token_start: int, min_n: int = 2, max_n: int = 8
-) -> list[tuple[str, int, int]]:
-    ngrams: list[tuple[str, int, int]] = []
-    for n in range(min_n, min(max_n, len(token_text)) + 1):
-        for i in range(len(token_text) - n + 1):
-            ngram_text = token_text[i : i + n]
-            start = token_start + i
-            end = token_start + i + n
-            ngrams.append((ngram_text, start, end))
-    return ngrams
+def _merge_spans(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    if not spans:
+        return []
+
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(spans):
+        if not merged or start > merged[-1][1]:
+            merged.append((start, end))
+            continue
+        merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+    return merged
+
+
+def _protected_spans(text: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+
+    if text.startswith("---\n"):
+        frontmatter_end = text.find("\n---", 4)
+        if frontmatter_end != -1:
+            line_end = text.find("\n", frontmatter_end + 4)
+            spans.append((0, len(text) if line_end == -1 else line_end + 1))
+
+    in_fence = False
+    fence_start = 0
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            if in_fence:
+                spans.append((fence_start, offset + len(line)))
+                in_fence = False
+            else:
+                fence_start = offset
+                in_fence = True
+        offset += len(line)
+    if in_fence:
+        spans.append((fence_start, len(text)))
+
+    for pattern in (_EXISTING_TERM, _HTML_TAG, _INLINE_CODE, _URL):
+        spans.extend((m.start(), m.end()) for m in pattern.finditer(text))
+
+    for m in _MARKDOWN_LINK_DESTINATION.finditer(text):
+        spans.append((m.start(1), m.end(1)))
+
+    return _merge_spans(spans)
+
+
+def _unprotected_segments(text: str) -> list[tuple[str, int]]:
+    segments: list[tuple[str, int]] = []
+    pos = 0
+    for start, end in _protected_spans(text):
+        if pos < start:
+            segments.append((text[pos:start], pos))
+        pos = end
+    if pos < len(text):
+        segments.append((text[pos:], pos))
+    return segments
+
+
+def _is_latin_short(term: str) -> bool:
+    return len(term) <= 4 and _LATIN_RANGE.search(term) is not None and _CJK_RANGE.search(term) is None
+
+
+def _is_cjk_term(term: str) -> bool:
+    return _CJK_RANGE.search(term) is not None
+
+
+def _word_count(term: str) -> int:
+    return len(_TERM_CHAR.findall(term))
+
+
+def build_term_index(glossary_terms: list[GlossaryTerm]) -> TermIndex:
+    exact_terms: list[GlossaryTerm] = []
+    fuzzy_terms_by_word_count: defaultdict[int, list[GlossaryTerm]] = defaultdict(list)
+
+    for term in glossary_terms:
+        exact_terms.append(term)
+        if term.source == "en" and not _is_cjk_term(term.text) and len(term.text) >= 4:
+            fuzzy_terms_by_word_count[_word_count(term.text)].append(term)
+
+    return TermIndex(
+        exact_terms=tuple(exact_terms),
+        fuzzy_terms_by_word_count={
+            count: tuple(terms) for count, terms in fuzzy_terms_by_word_count.items()
+        },
+    )
+
+
+def _has_latin_boundaries(text: str, start: int, end: int) -> bool:
+    before = text[start - 1] if start > 0 else ""
+    after = text[end] if end < len(text) else ""
+    return not (before.isascii() and (before.isalnum() or before == "_")) and not (
+        after.isascii() and (after.isalnum() or after == "_")
+    )
+
+
+def _find_exact_matches(
+    segment: str, segment_start: int, term_index: TermIndex
+) -> list[tuple[int, int, str, float]]:
+    matches: list[tuple[int, int, str, float]] = []
+
+    for term in term_index.exact_terms:
+        pattern = re.escape(term.text)
+        flags = re.IGNORECASE if term.source == "short" or not _is_cjk_term(term.text) else 0
+        for m in re.finditer(pattern, segment, flags):
+            start = segment_start + m.start()
+            end = segment_start + m.end()
+            if _is_latin_short(term.text) and not _has_latin_boundaries(segment, m.start(), m.end()):
+                continue
+            matches.append((start, end, term.text, 1.0))
+
+    return matches
 
 
 def find_matches(
     text: str,
-    glossary_terms: list[str],
+    glossary_terms: list[GlossaryTerm],
     threshold: float = 0.85,
 ) -> list[tuple[int, int, str, float]]:
-    tokens = _tokenize(text)
     matches: list[tuple[int, int, str, float]] = []
+    term_index = build_term_index(glossary_terms)
 
-    terms_lower = [(t, t.lower()) for t in glossary_terms]
-    use_cjk = _CJK_RANGE.search(text) is not None
+    for segment, segment_start in _unprotected_segments(text):
+        matches.extend(_find_exact_matches(segment, segment_start, term_index))
 
-    for n in range(1, min(6, len(tokens) + 1)):
-        for i in range(len(tokens) - n + 1):
-            phrase = " ".join(tok[0] for tok in tokens[i : i + n])
-            phrase_lower = phrase.lower()
-            span_start = tokens[i][1]
-            span_end = tokens[i + n - 1][2]
-
-            for term, term_lower in terms_lower:
-                if phrase_lower == term_lower:
-                    matches.append((span_start, span_end, term, 1.0))
-                    continue
-
-                ratio = difflib.SequenceMatcher(None, phrase_lower, term_lower).ratio()
-                if ratio >= threshold:
-                    matches.append((span_start, span_end, term, ratio))
-
-    if use_cjk:
-        for tok_text, tok_start, _tok_end in tokens:
-            if len(tok_text) < 3:
+        tokens = _tokenize(segment)
+        max_window = min(6, len(tokens) + 1)
+        for n in range(1, max_window):
+            fuzzy_terms = term_index.fuzzy_terms_by_word_count.get(n, ())
+            if not fuzzy_terms:
                 continue
-            for ngram_text, ng_start, ng_end in _cjk_char_ngrams(tok_text, tok_start):
-                ngram_lower = ngram_text.lower()
-                for term, term_lower in terms_lower:
-                    if ngram_lower == term_lower:
-                        matches.append((ng_start, ng_end, term, 1.0))
+            for i in range(len(tokens) - n + 1):
+                phrase = " ".join(tok[0] for tok in tokens[i : i + n])
+                if _CJK_RANGE.search(phrase) or not _WORD_CHAR.search(phrase):
+                    continue
+                phrase_lower = phrase.lower()
+                span_start = segment_start + tokens[i][1]
+                span_end = segment_start + tokens[i + n - 1][2]
+
+                for term in fuzzy_terms:
+                    term_lower = term.text.lower()
+                    if abs(len(phrase_lower) - len(term_lower)) > 3:
                         continue
-                    ratio = difflib.SequenceMatcher(
-                        None, ngram_lower, term_lower
-                    ).ratio()
+                    ratio = difflib.SequenceMatcher(None, phrase_lower, term_lower).ratio()
                     if ratio >= threshold:
-                        matches.append((ng_start, ng_end, term, ratio))
+                        matches.append((span_start, span_end, term.text, ratio))
+                    continue
 
     return matches
 
