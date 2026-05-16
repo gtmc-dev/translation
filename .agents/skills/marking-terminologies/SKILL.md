@@ -7,7 +7,7 @@ description: Use when marking source text with TechMC glossary terms, preparing 
 
 ## Overview
 
-Use this skill only for marking source text with TechMC glossary terms using `scripts/mark_terms.py`. For the full translation workflow, use `start-translate`. For standalone glossary lookups, use `querying-terminologies`.
+Use this skill only for marking source text with TechMC glossary terms using `scripts/mark_terms.py`. For the full translation workflow, use the `/start-translate` command. For standalone glossary lookups, use `querying-terminologies`.
 
 ## When to Use
 
@@ -70,4 +70,4 @@ For standalone glossary lookups with `scripts/query_glossary.py`, use the `query
 - Do not translate community terminology from memory when the TechMC glossary has an entry.
 - Do not discard the marked-term output; keep it as a reference while translating.
 - Do not use `>>` if the target reference file must be clean; remove the old file first or use `>` intentionally.
-- Do not use this skill as the full translation workflow entrance; use `start-translate` for that.
+- Do not use this skill as the full translation workflow entrance; use `/start-translate` for that.

@@ -1,15 +1,19 @@
 ---
-name: start-translate
-description: Use when starting Minecraft translation work, receiving source materials or target language, deciding workflow order, preserving output structure, or preparing translation QA before delivery.
+description: Start a Minecraft translation workflow, resolve source/target inputs, prepare terminology references, translate into output/, and run QA.
+argument-hint: [source path or target language]
 ---
 
-# Start Translate
+# /start-translate
 
-## Overview
+Execute this workflow when `/start-translate` is invoked. Treat it as the main translation command for this repository.
 
-Use this skill as the main workflow entrance for Minecraft translation tasks in this repository. Keep project identity in `AGENTS.md`, use this skill for the translation workflow, and load specialized terminology skills only when terminology marking or glossary lookup is needed.
+## Inputs
 
-## Translation Workflow Entrance
+- Source material may be provided directly, passed as an argument, or placed under `input/`.
+- Target language must be known before translation begins.
+- If either source material or target language is missing after checking direct input and `input/`, ask one precise question and stop.
+
+## Workflow
 
 1. Confirm both source material and target language. If material was not provided directly, inspect `input/`. If source material or target language is still missing, ask one precise question and stop.
 2. Preserve file structure exactly: write translated files under `output/` with the same relative paths as the source material.
@@ -40,7 +44,7 @@ Also consult these Minecraft-specific references when relevant:
 - Minecraft Wiki Language page: <https://minecraft.wiki/w/Language>
 - Minecraft community game terms: <https://minecraft.fandom.com/wiki/Tutorials/Game_terms>
 
-### Terminology Skills
+### Terminology Support
 
 - Use `marking-terminologies` only for producing marked source/reference files with `scripts/mark_terms.py`.
 - Use `querying-terminologies` only for direct TechMC glossary lookups with `scripts/query_glossary.py`.
@@ -68,3 +72,7 @@ Keep these categories distinct while translating:
 - Do not confuse community terminology with official Minecraft names.
 - Do not translate technical syntax such as translation keys, placeholders, commands, URLs, code spans, or formatting tags.
 - Do not put terminology-tool instructions here; keep detailed `mark_terms.py` usage in `marking-terminologies` and detailed `query_glossary.py` usage in `querying-terminologies`.
+
+## Final Response
+
+Report the output paths created, the target language, terminology references used, verification performed, and any source/term ambiguities that remain unresolved.

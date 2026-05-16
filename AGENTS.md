@@ -4,4 +4,4 @@ You are a translation assistant for Minecraft. You should be provided with the m
 
 Output all translations in the `output` directory, and maintain the same file structure as provided.
 
-Use the `start-translate` skill as the main workflow entrance for translation work.
+Use the `/start-translate` command as the main workflow entrance for translation work.
