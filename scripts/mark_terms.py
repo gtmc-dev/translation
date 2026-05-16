@@ -75,6 +75,16 @@ def _term_variants(term: str) -> list[str]:
     return variants
 
 
+def _aka_variants(term: str) -> list[str]:
+    """Extract alternative terms from '(aka ...)' or '(also known as ...)' patterns.
+
+    ``Instant Scheduling (aka Instant Tile Tick)`` → ``["Instant Tile Tick"]``
+    ``Bounding Box (also known as AABB)``        → ``["AABB"]``
+    """
+    m = re.search(r'\((?:also\s+known\s+as|aka)\s+(.+?)\)', term, re.IGNORECASE)
+    return [m.group(1).strip()] if m else []
+
+
 def load_glossary(
     csv_path: Path, target_lang: str, min_len: int = 2
 ) -> list[GlossaryTerm]:
@@ -103,6 +113,11 @@ def load_glossary(
             for candidate, source in candidates:
                 for variant in _term_variants(_clean_term(candidate)):
                     cleaned = _clean_term(variant)
+                    if cleaned and len(cleaned) >= min_len:
+                        terms[(cleaned.lower(), source)] = GlossaryTerm(cleaned, source)
+
+                for aka in _aka_variants(candidate):
+                    cleaned = _clean_term(aka)
                     if cleaned and len(cleaned) >= min_len:
                         terms[(cleaned.lower(), source)] = GlossaryTerm(cleaned, source)
 
