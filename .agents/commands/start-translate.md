@@ -37,12 +37,15 @@ The Minecraft Wiki is the authoritative source for official Minecraft translatio
 - Preparing reference materials for long translation tasks
 
 **How to use:**
-- For single terms: Query the wiki script with `--term` flag
-- For bulk lookup: Query by category (blocks, items, entities) and save as reference
+- For single terms: Query the wiki script with `--term` flag (default: compact table)
+- For bulk lookup: Query by category (blocks, items, entities); save as TSV for LLM reference (`--format tsv`)
 - For manual verification: Browse language-specific wiki pages directly
 
 **Available tools:**
 - `scripts/query_minecraft_wiki.py` — Automated wiki queries with caching
+  - Formats: `table` (default), `tsv`, `ndjson`, `json`, `csv`
+  - Prefer `--format tsv` for LLM reference data (most token-efficient)
+  - Prefer `--format ndjson` for stream processing (one JSON per line)
 - Language-specific wikis: `minecraft.wiki` (EN), `zh.minecraft.wiki` (ZH), `ja.minecraft.wiki` (JA), `es.minecraft.wiki` (ES)
 
 **Additional references:**
@@ -52,8 +55,10 @@ The Minecraft Wiki is the authoritative source for official Minecraft translatio
 
 ### Terminology Support
 
-- Use `marking-terminologies` only for producing marked source/reference files with `scripts/mark_terms.py`.
-- Use `querying-terminologies` only for direct TechMC glossary lookups with `scripts/query_glossary.py`.
+- Use `marking-terminologies` for producing marked source/reference files with `scripts/mark_terms.py`.
+  - Default: `<term>` tagged text output; use `--match-format json` for structured match data.
+- Use `querying-terminologies` for direct TechMC glossary lookups with `scripts/query_glossary.py`.
+  - Default: compact table; use `--format tsv` for LLM-friendly tabular output, `--format ndjson` for stream processing.
 
 Keep these categories distinct while translating:
 
@@ -70,6 +75,7 @@ Keep these categories distinct while translating:
 - Community and technical terms were checked with terminology references when they affected translation choices.
 - Placeholders such as `%s`, `%1$s`, `%1`, `{name}`, Markdown links, HTML/XML tags, color codes, commands, paths, URLs, code spans, and translation keys remain intact.
 - Marked-term output and useful query results were kept as reference notes when they informed the translation.
+- Output formats match the new compact defaults (table/TSV/NDJSON) — no verbose JSON indentation or decorative table borders.
 
 ## Common Mistakes
 
