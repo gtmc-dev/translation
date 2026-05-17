@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import difflib
 import re
 import sys
+import json
 from collections import defaultdict, namedtuple
 from pathlib import Path
 
@@ -372,6 +373,12 @@ def main() -> None:
         default=2,
         help="Minimum term length to consider (default: 2)",
     )
+    parser.add_argument(
+        "--match-format",
+        default="text",
+        choices=["text", "json"],
+        help="Output format: 'text' for <term>-tagged output, 'json' for structured JSON (default: text)",
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -382,27 +389,56 @@ def main() -> None:
         print(f"Error: glossary CSV not found: {args.glossary}", file=sys.stderr)
         sys.exit(1)
 
-    sys.stderr.write(f"Loading glossary ({args.lang})...\n")
+    if args.verbose:
+        sys.stderr.write(f"Loading glossary ({args.lang})...\n")
     terms = load_glossary(args.glossary, args.lang, args.min_len)
-    sys.stderr.write(f"Loaded {len(terms)} unique terms.\n")
+    if args.verbose:
+        sys.stderr.write(f"Loaded {len(terms)} unique terms.\n")
 
     text = args.input.read_text(encoding="utf-8")
 
-    sys.stderr.write(f"Matching with threshold {args.threshold}...\n")
+    if args.verbose:
+        sys.stderr.write(f"Matching with threshold {args.threshold}...\n")
     matches = find_matches(text, terms, args.threshold)
     resolved = resolve_overlaps(matches)
 
     if args.verbose:
-        print(f"\nMatched {len(resolved)} terms:", file=sys.stderr)
         for start, end, term, ratio in resolved:
             snippet = text[start:end]
-            print(f"  [{ratio:.2f}] {term!r} ← {snippet!r}", file=sys.stderr)
-        print(file=sys.stderr)
+            line_num = text[:start].count('\n') + 1
+            line_start = text.rfind('\n', 0, start) + 1 if '\n' in text[:start] else 0
+            pos_start = start - line_start
+            pos_end = end - line_start
+            if ratio >= 1.0:
+                print(f"{term} \u2192 {snippet} (L{line_num}:{pos_start}-{pos_end})", file=sys.stderr)
+            else:
+                print(f"[{ratio:.2f}] {term} \u2192 {snippet} (L{line_num}:{pos_start}-{pos_end})", file=sys.stderr)
 
-    output = mark_text(text, resolved)
+    if args.match_format == "json":
+        matches_json = []
+        for start, end, term, ratio in resolved:
+            translation = text[start:end]
+            line_num = text[:start].count('\n') + 1
+            matches_json.append({
+                "term": term,
+                "translation": translation,
+                "start": start,
+                "end": end,
+                "score": ratio,
+                "line": line_num,
+            })
+        output = json.dumps({
+            "original": text,
+            "marked": mark_text(text, resolved),
+            "matches": matches_json,
+        }, separators=(',', ':'), ensure_ascii=False)
+    else:
+        output = mark_text(text, resolved)
+
     if args.output:
         args.output.write_text(output, encoding="utf-8")
-        sys.stderr.write(f"Output written to {args.output}\n")
+        if args.verbose:
+            sys.stderr.write(f"Output written to {args.output}\n")
     else:
         sys.stdout.write(output)
 

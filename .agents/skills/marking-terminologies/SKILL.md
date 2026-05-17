@@ -40,8 +40,11 @@ python3 scripts/mark_terms.py article.md
 # Match another language
 python3 scripts/mark_terms.py article.md --lang en
 
-# Include matched terms and scores in stderr
+# Verbose: compact match log on stderr (one line per match)
 python3 scripts/mark_terms.py article.md --verbose
+
+# JSON output: structured matches with original/marked/matches
+python3 scripts/mark_terms.py article.md --match-format json
 
 # Use the script's own output option instead of redirection
 python3 scripts/mark_terms.py article.md -o output/article.marked.md
@@ -50,7 +53,7 @@ python3 scripts/mark_terms.py article.md -o output/article.marked.md
 python3 scripts/mark_terms.py article.md --min-len 4
 ```
 
-When using `--verbose` and you want both the marked text and match log for later reference, redirect them separately:
+When using `--verbose` and you want both the marked text and match log for later reference, redirect them separately (verbose output is now compact: `[0.95] Observer → 侦测器 (L12:42-50)`):
 
 ```bash
 python3 scripts/mark_terms.py article.md --verbose >> output/article.marked.md 2>> output/article.matches.log
@@ -62,6 +65,7 @@ For standalone glossary lookups with `scripts/query_glossary.py`, use the `query
 
 - The marked output was saved as a reference file when it will be used later.
 - `--verbose` match logs were redirected separately from marked text when both are needed.
+- `--match-format json` used when structured match data is needed for LLM consumption.
 - `>` was used only for intentional overwrite; `>>` was used for appendable reference notes.
 - Unclear matches were checked with `querying-terminologies` instead of guessed.
 

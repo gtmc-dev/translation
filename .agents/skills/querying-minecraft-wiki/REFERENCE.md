@@ -10,6 +10,8 @@ The Minecraft Wiki is the authoritative source for official Minecraft translatio
 
 **Automated Query Tool:**
 - `scripts/query_minecraft_wiki.py` — Query blocks/items/entities with caching
+  - Output formats: `tsv` (default, tab-separated) or `json` (compact array)
+  - Prefer TSV for LLM reference data (most token-efficient), JSON for programmatic use
 
 **Language-Specific Wikis:**
 - English: `https://minecraft.wiki/`

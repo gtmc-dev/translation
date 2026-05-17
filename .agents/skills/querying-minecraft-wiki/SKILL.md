@@ -22,7 +22,7 @@ Use this skill to query the Minecraft Wiki for official Minecraft translations. 
 `scripts/query_minecraft_wiki.py` queries minecraft.wiki via MediaWiki API.
 
 ```bash
-python3 scripts/query_minecraft_wiki.py --category blocks --language zh --format table
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh
 ```
 
 ## Common Queries
@@ -30,51 +30,54 @@ python3 scripts/query_minecraft_wiki.py --category blocks --language zh --format
 ### Bulk Category Lookup
 
 ```bash
-# Get all blocks in Chinese
-python3 scripts/query_minecraft_wiki.py --category blocks --language zh --format json
+# Get all blocks in Chinese (default: TSV)
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh
 
 # Get all items in Japanese
-python3 scripts/query_minecraft_wiki.py --category items --language ja --format table
+python3 scripts/query_minecraft_wiki.py --category items --language ja
 
-# Get all entities/mobs in Spanish
-python3 scripts/query_minecraft_wiki.py --category entities --language es --format csv
+# Save as TSV for LLM consumption (most token-efficient)
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh --format tsv -o references/blocks-zh.tsv
+
+# JSON for structured parsing
+python3 scripts/query_minecraft_wiki.py --category entities --language es --format json
 ```
 
 ### Single Term Lookup
 
 ```bash
-# Quick lookup for one term
-python3 scripts/query_minecraft_wiki.py --term "Diamond" --language zh --format table
+# Quick lookup (default TSV)
+python3 scripts/query_minecraft_wiki.py --term "Diamond" --language zh
 
-# Check a mob translation
+# Check a mob translation (JSON for programmatic use)
 python3 scripts/query_minecraft_wiki.py --term "Creeper" --language zh --format json
-
-# Verify a block name
-python3 scripts/query_minecraft_wiki.py --term "Stone" --language ja --format table
 ```
 
 ### Output Formats
 
 ```bash
-# JSON (default) - for programmatic use
+# TSV (default) - tab-separated, most token-efficient for LLM consumption
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh
+
+# JSON - compact array (no indent) for programmatic use
 python3 scripts/query_minecraft_wiki.py --category blocks --language zh --format json
-
-# CSV - for spreadsheet import
-python3 scripts/query_minecraft_wiki.py --category items --language zh --format csv
-
-# Table - for human reading
-python3 scripts/query_minecraft_wiki.py --category entities --language zh --format table
 ```
+
+Format comparison (for 1 record):
+- tsv: `"blocks"\t"Diamond Block"\t"diamond_block"\t"zh"\t"钻石块"` (~55 chars)
+- json: `[{"category":"blocks","english_title":"Diamond Block","nameid":"diamond_block","language":"zh","localized_name":"钻石块"}]` (~100 chars)
+
+Prefer `--format tsv` (default) for LLM reference data (most token-efficient). Use `--format json` when you need structured data for parsing.
 
 ### Output to File
 
 ```bash
-# Save to file instead of stdout
-python3 scripts/query_minecraft_wiki.py --category blocks --language zh -o references/blocks-zh.json
+# TSV (default) for LLM reference
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh -o references/blocks-zh.tsv
 
-# Create reference files for multiple languages
-python3 scripts/query_minecraft_wiki.py --category items --language zh -o references/items-zh.json
-python3 scripts/query_minecraft_wiki.py --category items --language ja -o references/items-ja.json
+# JSON for programmatic use
+python3 scripts/query_minecraft_wiki.py --category items --language zh --format json -o references/items-zh.json
+python3 scripts/query_minecraft_wiki.py --category items --language ja --format json -o references/items-ja.json
 ```
 
 ### Development & Testing
@@ -100,18 +103,34 @@ Each record contains:
 - `language`: Target language code
 - `localized_name`: Official translated name
 
-Example JSON output:
+Example outputs:
+
+```text
+# TSV (default)
+"category"	"english_title"	"nameid"	"language"	"localized_name"
+"blocks"	"Diamond Block"	"diamond_block"	"zh"	"钻石块"
+"blocks"	"Obsidian"	"obsidian"	"zh"	"黑曜石"
+```
 
 ```json
-[
-  {
-    "category": "blocks",
-    "english_title": "Diamond Block",
-    "nameid": "diamond_block",
-    "language": "zh",
-    "localized_name": "钻石块"
-  }
-]
+# JSON (compact array)
+[{"category":"blocks","english_title":"Diamond Block","nameid":"diamond_block","language":"zh","localized_name":"钻石块"},{"category":"blocks","english_title":"Obsidian","nameid":"obsidian","language":"zh","localized_name":"黑曜石"}]
+```
+
+```text
+# TSV (tab-separated, most token-efficient)
+category  english_title   nameid          language  localized_name
+blocks    Diamond Block   diamond_block   zh        钻石块
+```
+
+```text
+# NDJSON (one JSON object per line)
+{"category":"blocks","english_title":"Diamond Block","nameid":"diamond_block","language":"zh","localized_name":"钻石块"}
+```
+
+```json
+# JSON (compact array, no indent)
+[{"category":"blocks","english_title":"Diamond Block","nameid":"diamond_block","language":"zh","localized_name":"钻石块"}]
 ```
 
 ## Supported Categories
@@ -196,11 +215,11 @@ Use both when translating Minecraft content:
 
 ```bash
 # Get all blocks in Chinese for reference
-python3 scripts/query_minecraft_wiki.py --category blocks --language zh -o references/blocks-zh.json
+python3 scripts/query_minecraft_wiki.py --category blocks --language zh -o references/blocks-zh.tsv
 
 # Look up specific terms as needed
-python3 scripts/query_minecraft_wiki.py --term "Redstone" --language zh --format table
-python3 scripts/query_minecraft_wiki.py --term "Piston" --language zh --format table
+python3 scripts/query_minecraft_wiki.py --term "Redstone" --language zh
+python3 scripts/query_minecraft_wiki.py --term "Piston" --language zh
 ```
 
 ### Verify translations
@@ -215,13 +234,13 @@ python3 scripts/query_minecraft_wiki.py --term "Diamond Sword" --language zh --f
 ```bash
 # Build reference files for multiple languages
 for lang in zh ja es de fr; do
-  python3 scripts/query_minecraft_wiki.py --category blocks --language $lang -o references/blocks-$lang.json
+  python3 scripts/query_minecraft_wiki.py --category blocks --language $lang -o references/blocks-$lang.tsv
 done
 ```
 
 ## Manual Wiki References
 
-For content types not covered by the script (versions, structures, effects, biomes, advancements, enchantments, potions, commands), see `REFERENCE.md` in this skill directory for comprehensive wiki URLs.
+For content types not covered by the script (versions, structures, effects, biomes, advancements, enchantments, potions, commands), see @REFERENCE.md in this skill directory for comprehensive wiki URLs.
 
 ## Resources
 

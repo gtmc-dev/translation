@@ -61,6 +61,22 @@ python3 scripts/query_glossary.py --category "1.12.2_magic" --short "ITT"
 python3 scripts/query_glossary.py --category "1.12.2_magic" --lang zh "更新"
 ```
 
+## Output Formats
+
+```bash
+# TSV (default) - tab-separated, most token-efficient
+python3 scripts/query_glossary.py "chunk"
+
+# JSON - compact array for programmatic use
+python3 scripts/query_glossary.py "chunk" --format json
+```
+
+Format guide:
+- `tsv` (default): Tab-separated, most token-efficient for LLM reference data
+- `json`: Compact JSON array (no indent)
+
+Use `--limit N` to cap output rows.
+
 ## Columns
 
 Available columns: `category`, `short`, `en`, `en_desc`, `ar`, `ar_desc`, `zh`, `zh_desc`, `fr`, `fr_desc`, `de`, `de_desc`, `it`, `it_desc`, `ja`, `ja_desc`, `ko`, `ko_desc`, `pt`, `pt_desc`, `ru`, `ru_desc`, `es`, `es_desc`, `score`.

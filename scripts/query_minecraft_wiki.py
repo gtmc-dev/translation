@@ -9,6 +9,8 @@ Usage:
 
 import argparse
 import hashlib
+import csv
+import io
 import json
 import re
 import sys
@@ -312,30 +314,17 @@ def build_records(category: str, language: str, members: List[Dict], page_detail
     return sorted(records, key=lambda r: r["english_title"])
 
 
+def format_tsv(records: List[Dict[str, str]]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter='\t', quoting=csv.QUOTE_ALL)
+    writer.writerow(["category", "english_title", "nameid", "language", "localized_name"])
+    for r in records:
+        writer.writerow([r["category"], r["english_title"], r["nameid"], r["language"], r["localized_name"]])
+    return output.getvalue()
+
+
 def format_json(records: List[Dict[str, str]]) -> str:
-    return json.dumps(records, ensure_ascii=False, indent=2)
-
-
-def format_csv(records: List[Dict[str, str]]) -> str:
-    if not records:
-        return "category,english_title,nameid,language,localized_name\n"
-    
-    lines = ["category,english_title,nameid,language,localized_name"]
-    for r in records:
-        lines.append(f"{r['category']},{r['english_title']},{r['nameid']},{r['language']},{r['localized_name']}")
-    return "\n".join(lines) + "\n"
-
-
-def format_table(records: List[Dict[str, str]]) -> str:
-    if not records:
-        return "No records\n"
-    
-    lines = [f"{'English':<30} {'NameID':<25} {'Localized':<30}"]
-    lines.append("-" * 85)
-    for r in records:
-        lines.append(f"{r['english_title']:<30} {r['nameid']:<25} {r['localized_name']:<30}")
-    lines.append(f"\nTotal: {len(records)} records")
-    return "\n".join(lines) + "\n"
+    return json.dumps(records, ensure_ascii=False, separators=(',', ':'))
 
 
 def write_output(content: str, output_path: Optional[str]) -> None:
@@ -350,7 +339,7 @@ def main():
     parser.add_argument("--category", choices=["blocks", "items", "entities"], help="Category to query")
     parser.add_argument("--term", help="Query a single term by English title")
     parser.add_argument("--language", required=True, help="Target language code (e.g., zh, ja, de)")
-    parser.add_argument("--format", choices=["json", "csv", "table"], default="json", help="Output format")
+    parser.add_argument("--format", choices=["tsv", "json"], default="tsv", help="Output format: tsv (default) or json")
     parser.add_argument("-o", "--output", help="Output file path (default: stdout)")
     parser.add_argument("--cache-dir", help="Cache directory path")
     parser.add_argument("--cache-ttl", type=int, default=604800, help="Cache TTL in seconds (default: 7 days)")
@@ -415,12 +404,10 @@ def main():
             cache_dir, args.cache_ttl, args.no_cache, args.timeout, args.delay
         )
         
-        if args.format == "json":
-            output = format_json(records)
-        elif args.format == "csv":
-            output = format_csv(records)
+        if args.format == "tsv":
+            output = format_tsv(records)
         else:
-            output = format_table(records)
+            output = format_json(records)
         
         write_output(output, args.output)
         

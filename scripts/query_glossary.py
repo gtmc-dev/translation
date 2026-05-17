@@ -13,7 +13,8 @@ Usage:
 import argparse
 import csv
 import difflib
-import shutil
+import io
+import json
 import sys
 from collections import namedtuple
 from pathlib import Path
@@ -35,7 +36,8 @@ LANG_MAP: dict[str, LangColumns] = {
     "es": LangColumns(term_idx=22, desc_idx=23, label="Spanish"),
 }
 
-DEFAULT_GLOSSARY = Path(__file__).resolve().parent.parent / "glossary" / "TechMC Glossary.csv"
+DEFAULT_GLOSSARY = Path(__file__).resolve().parent.parent / \
+    "glossary" / "TechMC Glossary.csv"
 
 _SUBSTRING_BONUS = 0.9
 _CONTESTED_MARKER = "*"
@@ -58,8 +60,10 @@ def load_glossary(csv_path: Path) -> list[dict[str, str]]:
             for code, col in LANG_MAP.items():
                 if code == "en":
                     continue
-                term_val = row[col.term_idx].strip() if len(row) > col.term_idx else ""
-                desc_val = row[col.desc_idx].strip() if len(row) > col.desc_idx else ""
+                term_val = row[col.term_idx].strip() if len(
+                    row) > col.term_idx else ""
+                desc_val = row[col.desc_idx].strip() if len(
+                    row) > col.desc_idx else ""
                 record[code] = term_val
                 record[f"{code}_desc"] = desc_val
             rows.append(record)
@@ -114,59 +118,56 @@ def _strip_contested(text: str) -> str:
     return text.rstrip(_CONTESTED_MARKER).strip()
 
 
-def format_table(
+def format_tsv(
     rows: list[tuple[dict[str, str], float]] | list[dict[str, str]],
     columns: list[str],
     has_score: bool = False,
 ) -> str:
-    if not rows:
-        return "(no results)"
-
-    display_rows: list[list[str]] = []
+    """Tab-separated values with header row."""
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(columns)
     for item in rows:
         if has_score:
             row_dict, score = item  # type: ignore[misc]
         else:
             row_dict = item  # type: ignore[assignment]
             score = None
-
-        display: list[str] = []
+        row_out: list[str] = []
         for col in columns:
             if col == "score" and has_score:
-                display.append(f"{score:.2f}")  # type: ignore[union-attr]
-            elif col in LANG_MAP or col in ("en_desc",) or col.endswith("_desc"):
-                display.append(_strip_contested(row_dict.get(col, "")))
+                row_out.append(f"{score:.2f}")
+            elif col in LANG_MAP or col.endswith("_desc"):
+                row_out.append(_strip_contested(row_dict.get(col, "")))
             else:
-                display.append(row_dict.get(col, ""))
-        display_rows.append(display)
+                row_out.append(row_dict.get(col, ""))
+        writer.writerow(row_out)
+    return buf.getvalue()
 
-    col_widths = [len(col) for col in columns]
-    for row in display_rows:
-        for i, cell in enumerate(row):
-            col_widths[i] = max(col_widths[i], len(str(cell)))
 
-    term_width = shutil.get_terminal_size().columns
-
-    sep = "+" + "+".join("-" * (w + 2) for w in col_widths) + "+"
-    header = (
-        "| "
-        + " | ".join(col.ljust(w) for col, w in zip(columns, col_widths))
-        + " |"
-    )
-
-    lines = [sep, header, sep]
-    for row in display_rows:
-        truncated = [str(cell)[:w] for cell, w in zip(row, col_widths)]
-        line = (
-            "| "
-            + " | ".join(cell.ljust(w) for cell, w in zip(truncated, col_widths))
-            + " |"
-        )
-        lines.append(line)
-    lines.append(sep)
-    lines.append(f"({len(rows)} result{'s' if len(rows) != 1 else ''})")
-
-    return "\n".join(lines)
+def format_json(
+    rows: list[tuple[dict[str, str], float]] | list[dict[str, str]],
+    columns: list[str],
+    has_score: bool = False,
+) -> str:
+    """Compact JSON array (backward-compatible)."""
+    out_list: list[dict[str, str | float]] = []
+    for item in rows:
+        if has_score:
+            row_dict, score = item  # type: ignore[misc]
+        else:
+            row_dict = item  # type: ignore[assignment]
+            score = None
+        obj: dict[str, str | float] = {}
+        for col in columns:
+            if col == "score" and has_score:
+                obj[col] = round(score, 2)  # type: ignore[arg-type]
+            elif col in LANG_MAP or col.endswith("_desc"):
+                obj[col] = _strip_contested(row_dict.get(col, ""))
+            else:
+                obj[col] = row_dict.get(col, "")
+        out_list.append(obj)
+    return json.dumps(out_list, separators=(",", ":"), ensure_ascii=False)
 
 
 def main() -> None:
@@ -215,13 +216,28 @@ def main() -> None:
         default=DEFAULT_GLOSSARY,
         help="Path to TechMC Glossary.csv",
     )
+    parser.add_argument(
+        "--format",
+        default="tsv",
+        choices=["tsv", "json"],
+        help="Output format: tsv (default, tab-separated) or json (compact array)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of rows to display (default: no limit; "
+             "table output defaults to 50 when results exceed 50)",
+    )
     args = parser.parse_args()
 
     if not any([args.query, args.short, args.category]):
-        parser.error("At least one of QUERY, --short, or --category is required")
+        parser.error(
+            "At least one of QUERY, --short, or --category is required")
 
     if not args.glossary.exists():
-        print(f"Error: glossary CSV not found: {args.glossary}", file=sys.stderr)
+        print(
+            f"Error: glossary CSV not found: {args.glossary}", file=sys.stderr)
         sys.exit(1)
 
     glossary = load_glossary(args.glossary)
@@ -240,13 +256,23 @@ def main() -> None:
     if args.short:
         results = search_short(working_set, args.short)
     elif args.lang:
-        results = search_language(working_set, args.query or "", args.lang, args.threshold)
+        results = search_language(
+            working_set, args.query or "", args.lang, args.threshold)
         has_score = True
     else:
         results = search_term(working_set, args.query or "", args.threshold)
         has_score = True
 
-    print(format_table(results, columns, has_score))
+    if args.limit is not None and len(results) > args.limit:
+        results = results[: args.limit]
+
+    if args.format == "tsv":
+        formatted = format_tsv(results, columns, has_score)
+    else:
+        formatted = format_json(results, columns, has_score)
+
+    if formatted:
+        print(formatted)
 
 
 if __name__ == "__main__":
