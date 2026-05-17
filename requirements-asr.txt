@@ -1,0 +1,6 @@
+# Optional: Heavy dependencies for Automatic Speech Recognition (ASR).
+# This is NOT part of the default install. Only install when you need
+# to transcribe videos that have no subtitles available.
+# Requires ~5GB download for PyTorch.
+# pip install -r requirements-asr.txt
+openai-whisper
