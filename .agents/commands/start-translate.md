@@ -15,7 +15,7 @@ Execute this workflow when `/start-translate` is invoked. Treat it as the main t
 
 ## Workflow
 
-1. Confirm both source material and target language. If material was not provided directly, inspect `input/`. If source material or target language is still missing, ask one precise question and stop.
+1. Confirm both source material and target language. If material was not provided directly, inspect `input/`. If source material or target language is still missing, ask one precise question and stop. Determine the target language: if the source material is non-English, default target is English. If the source is English, ask the user for the target language before proceeding.
 2. Preserve file structure exactly: write translated files under `output/` with the same relative paths as the source material.
 3. Before translating long prose, prepare terminology references. Use `marking-terminologies` to mark source text with TechMC glossary terms. Use `querying-terminologies` for standalone glossary lookups.
 4. Use Minecraft Wiki language pages for official Minecraft names, including mobs, items, blocks, effects, advancements, and other canonical game terms.
@@ -83,6 +83,7 @@ Keep these categories distinct while translating:
 - Do not confuse community terminology with official Minecraft names.
 - Do not translate technical syntax such as translation keys, placeholders, commands, URLs, code spans, or formatting tags.
 - Do not put terminology-tool instructions here; keep detailed `mark_terms.py` usage in `marking-terminologies` and detailed `query_glossary.py` usage in `querying-terminologies`.
+- For video subtitle translation, use `/start-video-translate` instead.
 
 ## Final Response
 
