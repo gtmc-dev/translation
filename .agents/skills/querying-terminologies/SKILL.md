@@ -5,6 +5,10 @@ description: Use when searching the TechMC glossary, checking abbreviations or s
 
 # Querying Terminologies
 
+## Scope: TechMC Community Terms Only
+
+**The TechMC glossary is for the technical Minecraft community only.** It covers redstone, mechanics, and community jargon — not general Minecraft gameplay or official game terms. Do not use it to translate block names, item names, mob names, or any term that has an official Minecraft translation. For those, use `querying-minecraft-wiki`.
+
 ## Overview
 
 Use this skill to query `./glossary/TechMC Glossary.csv` before choosing community terminology. Prefer querying the glossary over guessing, especially for abbreviations, redstone/mechanics terms, and terms with descriptions.

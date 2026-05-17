@@ -240,7 +240,21 @@ done
 
 ## Manual Wiki References
 
-For content types not covered by the script (versions, structures, effects, biomes, advancements, enchantments, potions, commands), see @REFERENCE.md in this skill directory for comprehensive wiki URLs.
+The script returns top-level category entries only. For anything beyond a canonical name, fetch the wiki page directly. Common cases where the script is insufficient:
+
+- **Variants** — items or blocks with sub-types (e.g. wood types, dye colors, coral variants): the script returns the base name; fetch the item's wiki page to get all variant translations.
+- **Details and descriptions** — mechanics explanations, lore, usage notes, or any translated prose beyond the name itself.
+- **Entities with states** — mobs that have multiple forms (e.g. villager professions, horse variants, slime sizes): each state may have a distinct translated name on the wiki page.
+- **Advancements, effects, enchantments, potions** — not covered by the script's categories; fetch the relevant wiki page or index (see @REFERENCE.md).
+- **Edge cases and disambiguation** — when a term has multiple wiki entries (e.g. "Torch" vs "Soul Torch"), the script may return only one; fetch the page to confirm the correct translation.
+- **Non-item content** — structures, biomes, commands, game mechanics: no script support; use the wiki page directly.
+
+Fetch strategies:
+- Use `webfetch https://minecraft.wiki/w/<PageName>` for English source pages.
+- For localized names, use the language-specific wiki (e.g. `https://zh.minecraft.wiki/w/<PageName>`) or append `?uselang=<lang>` to the English URL.
+- Use the MediaWiki API for structured extraction: `https://minecraft.wiki/api.php?action=parse&page=<PageName>&prop=wikitext&format=json`
+
+For a full index of wiki URLs by content type, see @REFERENCE.md.
 
 ## Resources
 

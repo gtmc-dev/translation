@@ -15,6 +15,10 @@ Use this skill only for marking source text with TechMC glossary terms using `sc
 - When the user asks to mark, find, or check glossary terms.
 - When deciding whether a community term, abbreviation, or short form has an existing TechMC translation.
 
+## Scope: TechMC Community Terms Only
+
+**The TechMC glossary is for the technical Minecraft community only.** It covers redstone, mechanics, and community jargon — not general Minecraft gameplay or official game terms. Glossary matches on block names, item names, mob names, or any term with an official Minecraft translation are not authoritative — verify those against the Minecraft Wiki instead.
+
 ## TechMC Glossary
 
 The TechMC glossary repository is embedded as a submodule at `./glossary`. Use it for non-official terms used by the community.
