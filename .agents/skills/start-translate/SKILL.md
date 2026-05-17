@@ -29,20 +29,26 @@ External localization references support this structure: professional workflows 
 
 ### Minecraft Wiki
 
-Use the Minecraft Wiki as the authoritative source for official Minecraft translations. Compare the relevant language pages when verifying canonical terms.
+The Minecraft Wiki is the authoritative source for official Minecraft translations. Use it to verify canonical names for mobs, items, blocks, effects, advancements, and other game terms.
 
-| Language | URL |
-| --- | --- |
-| English | <https://minecraft.wiki/> |
-| Chinese | <https://zh.minecraft.wiki/> |
-| Japanese | <https://ja.minecraft.wiki/> |
-| Spanish | <https://es.minecraft.wiki/> |
+**When to use:**
+- Translating official Minecraft content (items, blocks, entities, game mechanics)
+- Verifying canonical names before finalizing translations
+- Preparing reference materials for long translation tasks
 
-Also consult these Minecraft-specific references when relevant:
+**How to use:**
+- For single terms: Query the wiki script with `--term` flag
+- For bulk lookup: Query by category (blocks, items, entities) and save as reference
+- For manual verification: Browse language-specific wiki pages directly
 
+**Available tools:**
+- `scripts/query_minecraft_wiki.py` — Automated wiki queries with caching
+- Language-specific wikis: `minecraft.wiki` (EN), `zh.minecraft.wiki` (ZH), `ja.minecraft.wiki` (JA), `es.minecraft.wiki` (ES)
+
+**Additional references:**
 - Minecraft Wiki Style Guide: <https://minecraft.wiki/w/Minecraft_Wiki:Style_guide>
 - Minecraft Wiki Language page: <https://minecraft.wiki/w/Language>
-- Minecraft community game terms: <https://minecraft.fandom.com/wiki/Tutorials/Game_terms>
+- Community game terms: <https://minecraft.fandom.com/wiki/Tutorials/Game_terms>
 
 ### Terminology Support
 
