@@ -10,3 +10,4 @@ Available skills:
 - `/marking-terminologies` - Mark source text with TechMC glossary terms
 - `/querying-terminologies` - Search TechMC glossary for community terms
 - `/querying-minecraft-wiki` - Query Minecraft Wiki for official translations
+- `/start-video-translate` - Translate video subtitles from YouTube/Bilibili
