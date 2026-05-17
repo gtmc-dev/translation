@@ -11,7 +11,11 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-import srt
+try:
+    import srt
+except ImportError:
+    print("Error: srt not installed. Run: pip install srt", file=sys.stderr)
+    sys.exit(1)
 
 
 def read_file(path, encodings=('utf-8-sig', 'latin-1')):
@@ -20,6 +24,9 @@ def read_file(path, encodings=('utf-8-sig', 'latin-1')):
         try:
             with open(path, 'r', encoding=encoding) as f:
                 return f.read()
+        except (FileNotFoundError, PermissionError) as e:
+            print(f"Error: Cannot read file {path}: {e}", file=sys.stderr)
+            sys.exit(1)
         except UnicodeDecodeError:
             continue
     raise ValueError(f"Could not decode {path} with any supported encoding")
@@ -100,7 +107,8 @@ def cmd_chunk(args):
             for sub in subs[i:chunk_end]
         ]
         chunks.append(chunk)
-        # Move forward by chunk_size - overlap
+        if chunk_end >= len(subs):
+            break
         i += args.chunk_size - args.overlap
     
     print(json.dumps(chunks, ensure_ascii=False, indent=2))
@@ -116,8 +124,15 @@ def cmd_extract_text(args):
 
 def cmd_reassemble(args):
     """Reassemble SRT from translated JSON."""
-    with open(args.input, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    try:
+        with open(args.input, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Input file not found: {args.input}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in {args.input}: {e}", file=sys.stderr)
+        sys.exit(1)
     
     # Flatten if chunked
     if data and isinstance(data[0], list):
@@ -140,14 +155,18 @@ def cmd_reassemble(args):
     
     subs = []
     for item in data:
-        content = item.get('translated_content', item.get('content', ''))
-        sub = srt.Subtitle(
-            index=item['index'],
-            start=parse_timestamp(item['start']),
-            end=parse_timestamp(item['end']),
-            content=content
-        )
-        subs.append(sub)
+        try:
+            content = item.get('translated_content', item.get('content', ''))
+            sub = srt.Subtitle(
+                index=item['index'],
+                start=parse_timestamp(item['start']),
+                end=parse_timestamp(item['end']),
+                content=content
+            )
+            subs.append(sub)
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"Error: Invalid item in JSON data: {e}", file=sys.stderr)
+            sys.exit(1)
     
     output = srt.compose(subs, reindex=True)
     
@@ -165,7 +184,6 @@ def main():
     # Parse command
     parse_parser = subparsers.add_parser('parse', help='Parse SRT file to JSON')
     parse_parser.add_argument('file', help='Input SRT file')
-    parse_parser.add_argument('--output-format', choices=['json', 'text'], default='json', help='Output format')
     parse_parser.set_defaults(func=cmd_parse)
     
     # Chunk command
@@ -182,7 +200,7 @@ def main():
     
     # Reassemble command
     reassemble_parser = subparsers.add_parser('reassemble', help='Reassemble SRT from translated JSON')
-    reassemble_parser.add_argument('--input', required=True, help='Input JSON file')
+    reassemble_parser.add_argument('input', help='Input JSON file')
     reassemble_parser.add_argument('-o', '--output', help='Output SRT file (default: stdout)')
     reassemble_parser.set_defaults(func=cmd_reassemble)
     
@@ -191,6 +209,14 @@ def main():
     if not args.command:
         parser.print_help()
         sys.exit(1)
+    
+    if args.command == 'chunk':
+        if args.chunk_size <= 0:
+            print("Error: chunk-size must be greater than 0", file=sys.stderr)
+            sys.exit(1)
+        if args.overlap >= args.chunk_size:
+            print("Error: overlap must be less than chunk-size", file=sys.stderr)
+            sys.exit(1)
     
     args.func(args)
 
